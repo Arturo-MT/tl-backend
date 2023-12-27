@@ -14,6 +14,17 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
+    def create_superuser(self, email, name, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self.create_user(email, name, password, **extra_fields)
+
 # The User class is a model that extends the AbstractUser class and adds additional fields and
 # relationships for user authentication and store ownership.
 class User(AbstractUser):
@@ -41,7 +52,7 @@ class User(AbstractUser):
     is_seller = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
 
-    owned_stores = models.ManyToManyField('Store', related_name='users', blank=True)
+    owned_stores = models.ManyToManyField('Store', related_name='users', blank=True,)
 
     objects = UserManager()
 
@@ -52,6 +63,8 @@ class Store(models.Model):
     address = models.CharField(max_length=50)
     phone_number = models.CharField(max_length=10)
     email = models.CharField(max_length=50, blank=False)
+
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True, related_name='stores')
 
     products_in_store = models.ManyToManyField('Product', related_name='stores', blank=True)
 
