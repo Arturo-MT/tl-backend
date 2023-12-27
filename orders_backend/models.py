@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager, Group, Permission
 from django.contrib.auth.hashers import make_password
 from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
 
 class UserManager(BaseUserManager):
     def create_user(self, email, name, password=None, **extra_fields):
@@ -66,6 +67,10 @@ class Product(models.Model):
     preview = models.ImageField(upload_to='products', blank=False)
     available = models.BooleanField(default=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, blank=False, related_name='products')
+
+    def clean(self):
+        if self.price < 0:
+            raise ValidationError("El precio no puede ser negativo")
 
     def __str__(self):
         return self.name
