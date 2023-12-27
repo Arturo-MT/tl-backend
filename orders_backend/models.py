@@ -1,34 +1,79 @@
 from django.db import models
+from django.contrib.auth.models import AbstractUser, BaseUserManager, Group, Permission
+from django.contrib.auth.hashers import make_password
+from django.utils.translation import gettext_lazy as _
 
-class User(models.Model):
-    name = models.CharField(max_length=50)
-    email = models.CharField(max_length=50)
-    phone_number = models.CharField(max_length=10)
-    password = models.CharField(max_length=50)
+class UserManager(BaseUserManager):
+    def create_user(self, email, name, password=None, **extra_fields):
+        if not email:
+            raise ValueError('El Email es obligatorio')
+        email = self.normalize_email(email)
+        user = self.model(email=email, name=name, **extra_fields)
+        user.password = make_password(password)
+        user.save(using=self._db)
+        return user
+
+# The User class is a model that extends the AbstractUser class and adds additional fields and
+# relationships for user authentication and store ownership.
+class User(AbstractUser):
+    # Otros campos de usuario
+    groups = models.ManyToManyField(
+        Group,
+        verbose_name=_('groups'),
+        blank=True,
+        related_name='custom_users'
+    )
+    user_permissions = models.ManyToManyField(
+        Permission,
+        verbose_name=_('user permissions'),
+        blank=True,
+        related_name='custom_users_permissions'
+    )
+
+    username = models.CharField(max_length=50, blank=True, null=True)
+    email = models.EmailField(unique=True)
+    name = models.CharField(max_length=50, blank=False, default='')
+    phone_number = models.CharField(max_length=10, blank=True, null=True)
+    password = models.CharField(max_length=128, blank=False)
+
+    is_superuser = models.BooleanField(default=False)
+    is_seller = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
-    store = models.ForeignKey('Store', on_delete=models.CASCADE, null=True, blank=True)
 
+    owned_stores = models.ManyToManyField('Store', related_name='users', blank=True)
+
+    objects = UserManager()
+
+# The `Store` class represents a store with attributes such as name, address, phone number, email, and
+# a many-to-many relationship with products.
 class Store(models.Model):
-    name = models.CharField(max_length=50)
+    name = models.CharField(max_length=50, blank=False)
     address = models.CharField(max_length=50)
     phone_number = models.CharField(max_length=10)
-    email = models.CharField(max_length=50)
+    email = models.CharField(max_length=50, blank=False)
+
+    products_in_store = models.ManyToManyField('Product', related_name='stores', blank=True)
 
     def __str__(self):
         return self.name
 
+# The `Product` class represents a product with attributes such as name, description, price, preview
+# image, availability, and a foreign key to the `Store` model.
 class Product(models.Model):
-    name = models.CharField(max_length=50)
-    price = models.DecimalField(max_digits=6, decimal_places=2)
-    preview = models.ImageField(upload_to='products', null=True, blank=True)
+    name = models.CharField(max_length=50, blank=False)
+    description = models.TextField(null=True, blank=True)
+    price = models.DecimalField(max_digits=6, decimal_places=2, default=0.00, blank=False)
+    preview = models.ImageField(upload_to='products', blank=False)
     available = models.BooleanField(default=True)
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, blank=False, related_name='products')
 
     def __str__(self):
         return self.name
 
+# The `Order` class represents an order made by a customer in a store, with various status options and
+# timestamps.
 class Order(models.Model):
-    customer = models.ForeignKey(User, on_delete=models.CASCADE)
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, blank=False)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
     
     STATUS_CHOICES = [
@@ -43,30 +88,35 @@ class Order(models.Model):
         max_length=1,
         choices=STATUS_CHOICES,
         default='R',
+        blank=False
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f'Pedido {self.id} - {self.customer.username}'
+        return f'Pedido {self.id} - {self.customer.name}'
 
+# The `OrderItem` class represents an item in an order, with properties such as the order it belongs
+# to, the product being ordered, the quantity, a description, and the store it is being ordered from.
 class OrderItem(models.Model):
-    order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField(default=1)
+    order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE, blank=False)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, blank=False)
+    quantity = models.PositiveIntegerField(default=1, blank=False)
     description = models.TextField(null=True, blank=True)
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, blank=False)
 
     def __str__(self):
         return f'Item {self.quantity} - {self.product.name}'
     
+# The Payment class represents a payment made for an order, including the amount, payment date, and
+# store information.
 class Payment(models.Model):
-    order = models.ForeignKey(Order, related_name='payments', on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=6, decimal_places=2)
+    order = models.ForeignKey(Order, related_name='payments', on_delete=models.CASCADE, blank=False)
+    amount = models.DecimalField(max_digits=6, decimal_places=2, default=0.00, blank=False)
     payment_date = models.DateTimeField(auto_now_add=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
-        return f'Pagamento {self.id} - Pedido {self.order.id} - {self.amount}'
+        return f'Pago {self.id} - Pedido {self.order.id} - {self.amount}'
     
