@@ -1,7 +1,7 @@
-from orders_backend.models import Product, User, Store
-from rest_framework import serializers
+from orders_backend.models import Product, User, Store, Order, OrderItem
+from rest_framework.serializers import ModelSerializer
 
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializer(ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'email', 'password', 'name', 'phone_number', 'is_superuser', 'is_seller', 'is_staff', 'owned_stores']
@@ -26,12 +26,22 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-class StoreSerializer(serializers.ModelSerializer):
+class StoreSerializer(ModelSerializer):
     class Meta:
         model = Store
         fields = '__all__'
 
-class ProductSerializer(serializers.ModelSerializer):
+class ProductSerializer(ModelSerializer):
     class Meta:
         model = Product
+        fields = '__all__'
+
+class OrderSerializer(ModelSerializer):
+    class Meta:
+        model = Order
+        fields = '__all__'
+
+class OrderItemSerializer(ModelSerializer):
+    class Meta:
+        model = OrderItem
         fields = '__all__'
