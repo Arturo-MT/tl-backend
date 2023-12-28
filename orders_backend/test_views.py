@@ -40,8 +40,10 @@ class StoreViewSetTest(APITestCase):
     def setUp(self):
         self.user1 = User.objects.create_user(email='user1@example.com', name='User 1', password='testpass123')
         self.user2 = User.objects.create_user(email='user2@example.com', name='User 2', password='testpass123')
+        self.superuser = User.objects.create_superuser(email='superuser@example.com', name='Superuser', password='superpass123')
         Store.objects.create(name='Store 1', owner=self.user1, address='123 Main St', email='store1@example.com')
         Store.objects.create(name='Store 2', owner=self.user2, address='456 Elm St', email='store2@example.com')
+        Store.objects.create(name='Store 3', owner=self.user2, address='789 Oak St', email='store2@example.com')
 
     def test_user_sees_own_stores(self):
         self.client.force_authenticate(user=self.user1)
@@ -49,11 +51,17 @@ class StoreViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
 
-    def test_superuser_sees_all_stores(self):
-        self.client.force_authenticate(user=self.user1)
+    def test_user_cannot_see_other_user_stores(self):
+        self.client.force_authenticate(user=self.user2)
         response = self.client.get(reverse('store-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data), 2)
+
+    def test_superuser_sees_all_stores(self):
+        self.client.force_authenticate(user=self.superuser)
+        response = self.client.get(reverse('store-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)
 
 class ProductViewSetTest(APITestCase):
     def setUp(self):
@@ -64,6 +72,7 @@ class ProductViewSetTest(APITestCase):
         Store.objects.create(name='Store 2', owner=self.user2, address='456 Elm St', email='store2@example.com')
         Product.objects.create(name='Product 1', price=10.00, store=Store.objects.get(name='Store 1'))
         Product.objects.create(name='Product 2', price=20.00, store=Store.objects.get(name='Store 2'))
+        Product.objects.create(name='Product 3', price=30.00, store=Store.objects.get(name='Store 2'))
     
     def test_user_sees_own_products(self):
         self.client.force_authenticate(user=self.user1)
@@ -71,8 +80,14 @@ class ProductViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
     
+    def test_user_cannot_see_other_user_products(self):
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('product-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+    
     def test_superuser_sees_all_products(self):
         self.client.force_authenticate(user=self.superuser)
         response = self.client.get(reverse('product-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data), 3)
