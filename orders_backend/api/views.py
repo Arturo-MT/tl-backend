@@ -26,3 +26,9 @@ class StoreViewSet(viewsets.ModelViewSet):
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return Product.objects.all()
+        return Product.objects.filter(store__owner=self.request.user)
