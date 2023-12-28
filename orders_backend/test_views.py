@@ -1,7 +1,7 @@
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from orders_backend.models import User, Store, Product
+from orders_backend.models import User, Store, Product, Order, OrderItem
 
 class UserCreateViewTest(APITestCase):
     def test_create_user(self):
@@ -91,3 +91,54 @@ class ProductViewSetTest(APITestCase):
         response = self.client.get(reverse('product-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 3)
+
+class OrderViewSetTest(APITestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(email='user1@example.com', name='User 1', password='testpass123')
+        self.user2 = User.objects.create_user(email='user2@example.com', name='User 2', password='testpass123')
+        self.superuser = User.objects.create_superuser(email='superuser@example.com', name='Superuser', password='superpass123')
+
+        self.store1 = Store.objects.create(name='Store 1', owner=self.user1, address='123 Main St', email='store1@example.com')
+        self.store2 = Store.objects.create(name='Store 2', owner=self.user2, address='456 Elm St', email='store2@example.com')
+
+        self.product1 = Product.objects.create(name='Product 1', price=10.00, store=self.store1)
+        self.product2 = Product.objects.create(name='Product 2', price=20.00, store=self.store2)
+        self.product3 = Product.objects.create(name='Product 3', price=30.00, store=self.store2)
+
+        self.order1 = Order.objects.create(customer=self.user1, store=self.store1)
+        self.order2 = Order.objects.create(customer=self.user2, store=self.store2)
+        self.order3 = Order.objects.create(customer=self.user2, store=self.store2)
+
+        OrderItem.objects.create(order=self.order1, product=self.product1, quantity=2)
+        OrderItem.objects.create(order=self.order2, product=self.product2, quantity=1)
+        OrderItem.objects.create(order=self.order2, product=self.product3, quantity=3)
+
+    def test_user_sees_own_orders(self):
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get(reverse('order-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+    
+    def test_user_cannot_see_other_user_orders(self):
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('order-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+    
+    def test_superuser_sees_all_orders(self):
+        self.client.force_authenticate(user=self.superuser)
+        response = self.client.get(reverse('order-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)
+    
+    def test_seller_only_sees_orders_from_their_stores(self):
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('order-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+    
+    def test_seller_cannot_see_orders_from_other_stores(self):
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('order-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
