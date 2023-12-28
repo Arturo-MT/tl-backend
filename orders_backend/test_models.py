@@ -128,7 +128,7 @@ class OrderItemModelTest(TestCase):
         self.store = Store.objects.create(name='Test Store', address='123 Main St', phone_number='1234567890', email='test@store.com')
         self.product = Product.objects.create(name='Test Product', description='Test Description', price=10.0, available=True, store=self.store)
         self.order = Order.objects.create(customer=self.user, status='R', store=self.store)
-        self.order_item = OrderItem.objects.create(order=self.order, product=self.product, quantity=2, store=self.store, description='Test Description')
+        self.order_item = OrderItem.objects.create(order=self.order, product=self.product, quantity=2, description='Test Description')
 
     def test_quantity(self):
         order_item = self.order_item
@@ -145,10 +145,6 @@ class OrderItemModelTest(TestCase):
     def test_product_relation(self):
         order_item = self.order_item
         self.assertEqual(order_item.product, self.product)
-    
-    def test_store_relation(self):
-        order_item = self.order_item
-        self.assertEqual(order_item.store, self.store)
 
 """ class PaymentModelTest(TestCase):
     @classmethod
