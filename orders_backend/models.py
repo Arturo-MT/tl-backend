@@ -66,6 +66,7 @@ class Store(models.Model):
     address = models.CharField(max_length=50)
     phone_number = models.CharField(max_length=10)
     email = models.CharField(max_length=50, blank=False)
+    logo = models.ImageField(upload_to='logos', blank=True, null=True)
 
     owner = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True, related_name='stores')
 
