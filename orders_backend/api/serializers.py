@@ -1,5 +1,5 @@
 from orders_backend.models import Product, User, Store, Order, OrderItem
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import ModelSerializer, PrimaryKeyRelatedField, CurrentUserDefault
 
 class UserSerializer(ModelSerializer):
     class Meta:
@@ -27,6 +27,11 @@ class UserSerializer(ModelSerializer):
         return instance
 
 class StoreSerializer(ModelSerializer):
+    owner = PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        default=CurrentUserDefault()
+    )
+    
     class Meta:
         model = Store
         fields = '__all__'
