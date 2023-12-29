@@ -56,6 +56,9 @@ class User(AbstractUser):
 
     objects = UserManager()
 
+    def __str__(self):
+        return self.name or ''
+
 # The `Store` class represents a store with attributes such as name, address, phone number, email, and
 # a many-to-many relationship with products.
 class Store(models.Model):
@@ -69,7 +72,7 @@ class Store(models.Model):
     products_in_store = models.ManyToManyField('Product', related_name='stores', blank=True)
 
     def __str__(self):
-        return self.name
+        return self.name or ''
 
 # The `Product` class represents a product with attributes such as name, description, price, preview
 # image, availability, and a foreign key to the `Store` model.
@@ -84,9 +87,9 @@ class Product(models.Model):
     def clean(self):
         if self.price < 0:
             raise ValidationError("El precio no puede ser negativo")
-
+        
     def __str__(self):
-        return self.name
+        return self.name or ''
 
 # The `Order` class represents an order made by a customer in a store, with various status options and
 # timestamps.
@@ -113,7 +116,7 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f'Pedido {self.id} - {self.customer.name} - {self.store.name}'
+        return self.name or ''
 
 # The `OrderItem` class represents an item in an order, with properties such as the order it belongs
 # to, the product being ordered, the quantity, a description, and the store it is being ordered from.
@@ -124,7 +127,7 @@ class OrderItem(models.Model):
     description = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return f'Item {self.quantity} - {self.product.name} - Pedido {self.order.id}'
+        return self.name or ''
     
 # The Payment class represents a payment made for an order, including the amount, payment date, and
 # store information.
@@ -133,7 +136,6 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=6, decimal_places=2, default=0.00, blank=False)
     payment_date = models.DateTimeField(auto_now_add=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
-
-    def __str__(self):
-        return f'Pago {self.id} - Pedido {self.order.id} - {self.amount}'
     
+    def __str__(self):
+        return self.name or ''
