@@ -2,6 +2,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from orders_backend.models import User, Store, Product, Order, OrderItem
+from decimal import Decimal
 
 class UserCreateViewTest(APITestCase):
     def test_create_user(self):
@@ -38,30 +39,121 @@ class UserDetailViewTest(APITestCase):
 
 class StoreViewSetTest(APITestCase):
     def setUp(self):
-        self.user1 = User.objects.create_user(email='user1@example.com', name='User 1', password='testpass123')
-        self.user2 = User.objects.create_user(email='user2@example.com', name='User 2', password='testpass123')
+        self.user1 = User.objects.create_user(email='user1@example.com', name='User 1', password='testpass123', is_seller=True)
+        self.user2 = User.objects.create_user(email='user2@example.com', name='User 2', password='testpass123', is_seller=True)
+        self.user3 = User.objects.create_user(email='user3@example.com', name='User 3', password='testpass123', is_seller=False)
         self.superuser = User.objects.create_superuser(email='superuser@example.com', name='Superuser', password='superpass123')
         Store.objects.create(name='Store 1', owner=self.user1, address='123 Main St', email='store1@example.com')
         Store.objects.create(name='Store 2', owner=self.user2, address='456 Elm St', email='store2@example.com')
-        Store.objects.create(name='Store 3', owner=self.user2, address='789 Oak St', email='store2@example.com')
-
-    def test_user_sees_own_stores(self):
-        self.client.force_authenticate(user=self.user1)
-        response = self.client.get(reverse('store-list'))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-
-    def test_user_cannot_see_other_user_stores(self):
-        self.client.force_authenticate(user=self.user2)
-        response = self.client.get(reverse('store-list'))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        Store.objects.create(name='Store 3', owner=self.user2, address='789 Oak St', email='store3@example.com')
 
     def test_superuser_sees_all_stores(self):
         self.client.force_authenticate(user=self.superuser)
         response = self.client.get(reverse('store-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 3)
+
+    def test_unauthenticated_user_can_see_stores(self):
+        response = self.client.get(reverse('store-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)
+    
+    def test_no_sellers_cannot_create_stores(self):
+        self.client.force_authenticate(user=self.user3)
+        url = reverse('store-list')
+        data = {'name': 'Store 4', 'address': '123 Main St', 'email': 'store4@example.com', 'owner': self.user3.pk, 'phone_number': '1234567890'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Store.objects.count(), 3)
+    
+    def test_sellers_can_create_stores(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('store-list')
+        data = {'name': 'Store 4', 'address': '123 Main St', 'email': 'store4@example.com', 'owner': self.user1.pk, 'phone_number': '1234567890'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Store.objects.count(), 4)
+    
+    def test_sellers_cannot_create_stores_for_other_sellers(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('store-list')
+        data = {'name': 'Store 4', 'address': '123 Main St', 'email': 'store5@example.com', 'owner': self.user2.pk, 'phone_number': '1234567890'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Store.objects.count(), 3)
+    
+    def test_sellers_can_update_own_stores(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 1').pk})
+        data = {'name': 'Store 1', 'address': '123 Main St', 'email': 'store1@example.com', 'owner': self.user1.pk, 'phone_number': '1234567890'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Store.objects.get(name='Store 1').phone_number, '1234567890')
+
+    def test_sellers_cannot_update_other_sellers_stores(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 2').pk})
+        data = {'name': 'Store 2', 'address': '123 Main St', 'email': 'store2@example.com', 'owner': self.user2.pk, 'phone_number': '1234567890'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertNotEqual(Store.objects.get(name='Store 2').phone_number, '1234567890')
+    
+    def test_sellers_can_delete_own_stores(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 1').pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Store.objects.count(), 2)
+    
+    def test_sellers_cannot_delete_other_sellers_stores(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 2').pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Store.objects.count(), 3)
+    
+    def test_unauthenticated_user_cannot_create_stores(self):
+        url = reverse('store-list')
+        data = {'name': 'Store 4', 'address': '123 Main St', 'email': 'store3@example.com', 'owner': self.user3.pk, 'phone_number': '1234567890'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Store.objects.count(), 3)
+
+    def test_unauthenticated_user_cannot_update_stores(self):
+        url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 1').pk})
+        data = {'name': 'Store 1', 'address': '123 Main St', 'email': 'store4@example.com', 'owner': self.user1.pk, 'phone_number': '1234567890'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertNotEqual(Store.objects.get(name='Store 1').phone_number, '1234567890')
+    
+    def test_unauthenticated_user_cannot_delete_stores(self):
+        url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 1').pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Store.objects.count(), 3)
+    
+    def test_non_seller_users_cannot_create_stores(self):
+        self.client.force_authenticate(user=self.user3)
+        url = reverse('store-list')
+        data = {'name': 'Store 4', 'address': '123 Main St', 'email': 'store3@example.com', 'owner': self.user3.pk, 'phone_number': '1234567890'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Store.objects.count(), 3)
+    
+    def test_non_seller_users_cannot_update_stores(self):
+        self.client.force_authenticate(user=self.user3)
+        url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 1').pk})
+        data = {'name': 'Store 1', 'address': '123 Main St', 'email': 'store3@example.com', 'owner': self.user1.pk, 'phone_number': '1234567890'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertNotEqual(Store.objects.get(name='Store 1').phone_number, '1234567890')
+    
+    def test_non_seller_users_cannot_delete_stores(self):
+        self.client.force_authenticate(user=self.user3)
+        url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 1').pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Store.objects.count(), 3)
 
 class ProductViewSetTest(APITestCase):
     def setUp(self):
@@ -74,23 +166,119 @@ class ProductViewSetTest(APITestCase):
         Product.objects.create(name='Product 2', price=20.00, store=Store.objects.get(name='Store 2'))
         Product.objects.create(name='Product 3', price=30.00, store=Store.objects.get(name='Store 2'))
     
-    def test_user_sees_own_products(self):
-        self.client.force_authenticate(user=self.user1)
-        response = self.client.get(reverse('product-list'))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-    
-    def test_user_cannot_see_other_user_products(self):
-        self.client.force_authenticate(user=self.user2)
-        response = self.client.get(reverse('product-list'))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
-    
     def test_superuser_sees_all_products(self):
         self.client.force_authenticate(user=self.superuser)
         response = self.client.get(reverse('product-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 3)
+
+    def test_authenticated_user_cam_see_all_products(self):
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get(reverse('product-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)
+
+    def test_unauthenticated_user_can_see_products(self):
+        response = self.client.get(reverse('product-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)
+    
+    def test_no_store_owner_cannot_create_products(self):
+        self.client.force_authenticate(user=self.user2)
+        url = reverse('product-list')
+        data = {'name': 'Product 4', 'price': 40.00, 'store': Store.objects.get(name='Store 1').pk}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.count(), 3)
+
+    def test_store_owner_can_create_products(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('product-list')
+        data = {'name': 'Product 4', 'price': 40.00, 'store': Store.objects.get(name='Store 1').pk}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Product.objects.count(), 4)
+    
+    def test_store_owner_cannot_create_products_for_other_stores(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('product-list')
+        data = {'name': 'Product 4', 'price': 40.00, 'store': Store.objects.get(name='Store 2').pk}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.count(), 3)
+    
+    def test_store_owner_can_update_own_products(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 1').pk})
+        data = {'name': 'Product 1', 'price': 10.00, 'store': Store.objects.get(name='Store 1').pk}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Product.objects.get(name='Product 1').price, 10.00)
+    
+    def test_store_owner_cannot_update_other_store_products(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 2').pk})
+        data = {'name': 'Product 2', 'price': 20.00, 'store': Store.objects.get(name='Store 2').pk}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.get(name='Product 2').price, Decimal('20.00'))
+    
+    def test_store_owner_can_delete_own_products(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 1').pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Product.objects.count(), 2)
+    
+    def test_store_owner_cannot_delete_other_store_products(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 2').pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.count(), 3)
+    
+    def test_unauthenticated_user_cannot_create_products(self):
+        url = reverse('product-list')
+        data = {'name': 'Product 4', 'price': 40.00, 'store': Store.objects.get(name='Store 1').pk}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.count(), 3)
+    
+    def test_unauthenticated_user_cannot_update_products(self):
+        url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 1').pk})
+        data = {'name': 'Product 1', 'price': 10.00, 'store': Store.objects.get(name='Store 1').pk}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.get(name='Product 1').price, 10.00)
+
+    def test_unauthenticated_user_cannot_delete_products(self):
+        url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 1').pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.count(), 3)
+    
+    def test_non_seller_users_cannot_create_products(self):
+        self.client.force_authenticate(user=self.user2)
+        url = reverse('product-list')
+        data = {'name': 'Product 4', 'price': 40.00, 'store': Store.objects.get(name='Store 1').pk}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.count(), 3)
+    
+    def test_non_seller_users_cannot_update_products(self):
+        self.client.force_authenticate(user=self.user2)
+        url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 1').pk})
+        data = {'name': 'Product 1', 'price': 10.00, 'store': Store.objects.get(name='Store 1').pk}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.get(name='Product 1').price, 10.00)
+    
+    def test_non_seller_users_cannot_delete_products(self):
+        self.client.force_authenticate(user=self.user2)
+        url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 1').pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.count(), 3)
 
 class OrderViewSetTest(APITestCase):
     def setUp(self):
