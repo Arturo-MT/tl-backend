@@ -81,7 +81,7 @@ class Product(models.Model):
     name = models.CharField(max_length=50, blank=False)
     description = models.TextField(null=True, blank=True)
     price = models.DecimalField(max_digits=6, decimal_places=2, default=0.00, blank=False)
-    preview = models.ImageField(upload_to='products', blank=False)
+    preview = models.ImageField(upload_to='products', blank=True, null=True)
     available = models.BooleanField(default=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, blank=False, related_name='products')
 
