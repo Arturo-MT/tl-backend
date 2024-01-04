@@ -5,3 +5,4 @@ psycopg[binary]==3.0.18
 psycopg2==2.8.6
 pillow==8.4.0
 djangorestframework==3.12.4
+django-cors-headers==3.8.0
