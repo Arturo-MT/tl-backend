@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'orders_backend.apps.OrdersBackendConfig',
     'corsheaders',
+    'rest_framework_simplejwt'
 ]
 
 MIDDLEWARE = [
@@ -106,7 +107,10 @@ DATABASES = {
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
-    ]
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+       'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
 }
 
 MEDIA_URL = '/media/'
