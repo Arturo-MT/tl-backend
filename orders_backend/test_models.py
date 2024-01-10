@@ -7,14 +7,14 @@ class UserModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             email='test@example.com',
-            name='Test User',
+            username='Test User',
             phone_number='1234567890',
             password='testpassword'
         )
 
     def test_user_creation(self):
         self.assertEqual(self.user.email, 'test@example.com')
-        self.assertEqual(self.user.name, 'Test User')
+        self.assertEqual(self.user.username, 'Test User')
         self.assertEqual(self.user.phone_number, '1234567890')
         self.assertTrue(self.user.check_password('testpassword'))
         self.assertFalse(self.user.is_superuser)
@@ -26,7 +26,7 @@ class UserModelTest(TestCase):
         with self.assertRaises(IntegrityError):
             User.objects.create_user(
                 email='test@example.com',
-                name='Another User',
+                username='Another User',
                 password='testpassword'
             )
 
@@ -108,12 +108,12 @@ class ProductModelTest(TestCase):
 
 class OrderModelTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email='test@example.com', name='testuser', password='12345')
+        self.user = User.objects.create_user(email='test@example.com', username='testuser', password='12345')
         self.store = Store.objects.create(name='Test Store', address='Test Address', phone_number='1234567890', email='test@store.com')
         self.order = Order.objects.create(customer=self.user, status='R', store=self.store)
 
     def test_customer_relation(self):
-        self.assertEqual(self.order.customer.name, 'testuser')
+        self.assertEqual(self.order.customer.username, 'testuser')
 
     def test_status_label(self):
         field_label = self.order._meta.get_field('status').verbose_name
@@ -124,7 +124,7 @@ class OrderModelTest(TestCase):
 
 class OrderItemModelTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email='test@example.com', name='testuser', password='testpassword')
+        self.user = User.objects.create_user(email='test@example.com', username='testuser', password='testpassword')
         self.store = Store.objects.create(name='Test Store', address='123 Main St', phone_number='1234567890', email='test@store.com')
         self.product = Product.objects.create(name='Test Product', description='Test Description', price=10.0, available=True, store=self.store)
         self.order = Order.objects.create(customer=self.user, status='R', store=self.store)

@@ -7,7 +7,7 @@ from decimal import Decimal
 class UserCreateViewTest(APITestCase):
     def test_create_user(self):
         url = reverse('user-create')
-        data = {'email': 'test@example.com', 'name': 'Test User', 'password': 'testpass123'}
+        data = {'email': 'test@example.com', 'username': 'Test User', 'password': 'testpass123'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(User.objects.count(), 1)
@@ -15,8 +15,8 @@ class UserCreateViewTest(APITestCase):
 
 class UserDetailViewTest(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email='user@example.com', name='Normal User', password='testpass123')
-        self.superuser = User.objects.create_superuser(email='superuser@example.com', name='Superuser', password='superpass123')
+        self.user = User.objects.create_user(email='user@example.com', username='Normal User', password='testpass123')
+        self.superuser = User.objects.create_superuser(email='superuser@example.com', username='Superuser', password='superpass123')
 
     def test_user_access_own_details(self):
         self.client.force_authenticate(user=self.user)
@@ -39,10 +39,10 @@ class UserDetailViewTest(APITestCase):
 
 class StoreViewSetTest(APITestCase):
     def setUp(self):
-        self.user1 = User.objects.create_user(email='user1@example.com', name='User 1', password='testpass123', is_seller=True)
-        self.user2 = User.objects.create_user(email='user2@example.com', name='User 2', password='testpass123', is_seller=True)
-        self.user3 = User.objects.create_user(email='user3@example.com', name='User 3', password='testpass123', is_seller=False)
-        self.superuser = User.objects.create_superuser(email='superuser@example.com', name='Superuser', password='superpass123')
+        self.user1 = User.objects.create_user(email='user1@example.com', username='User 1', password='testpass123', is_seller=True)
+        self.user2 = User.objects.create_user(email='user2@example.com', username='User 2', password='testpass123', is_seller=True)
+        self.user3 = User.objects.create_user(email='user3@example.com', username='User 3', password='testpass123', is_seller=False)
+        self.superuser = User.objects.create_superuser(email='superuser@example.com', username='Superuser', password='superpass123')
         Store.objects.create(name='Store 1', owner=self.user1, address='123 Main St', email='store1@example.com')
         Store.objects.create(name='Store 2', owner=self.user2, address='456 Elm St', email='store2@example.com')
         Store.objects.create(name='Store 3', owner=self.user2, address='789 Oak St', email='store3@example.com')
@@ -123,13 +123,13 @@ class StoreViewSetTest(APITestCase):
         url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 1').pk})
         data = {'name': 'Store 1', 'address': '123 Main St', 'email': 'store4@example.com', 'owner': self.user1.pk, 'phone_number': '1234567890'}
         response = self.client.put(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertNotEqual(Store.objects.get(name='Store 1').phone_number, '1234567890')
     
     def test_unauthenticated_user_cannot_delete_stores(self):
         url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 1').pk})
         response = self.client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(Store.objects.count(), 3)
     
     def test_non_seller_users_cannot_create_stores(self):
@@ -157,9 +157,9 @@ class StoreViewSetTest(APITestCase):
 
 class ProductViewSetTest(APITestCase):
     def setUp(self):
-        self.user1 = User.objects.create_user(email='user1@example.com', name='User 1', password='testpass123')
-        self.user2 = User.objects.create_user(email='user2@example.com', name='User 2', password='testpass123')
-        self.superuser = User.objects.create_superuser(email='superuser@example.com', name='Superuser', password='superpass123')
+        self.user1 = User.objects.create_user(email='user1@example.com', username='User 1', password='testpass123')
+        self.user2 = User.objects.create_user(email='user2@example.com', username='User 2', password='testpass123')
+        self.superuser = User.objects.create_superuser(email='superuser@example.com', username='Superuser', password='superpass123')
         Store.objects.create(name='Store 1', owner=self.user1, address='123 Main St', email='store1@example.com')
         Store.objects.create(name='Store 2', owner=self.user2, address='456 Elm St', email='store2@example.com')
         Product.objects.create(name='Product 1', price=10.00, store=Store.objects.get(name='Store 1'))
@@ -248,13 +248,13 @@ class ProductViewSetTest(APITestCase):
         url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 1').pk})
         data = {'name': 'Product 1', 'price': 10.00, 'store': Store.objects.get(name='Store 1').pk}
         response = self.client.put(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(Product.objects.get(name='Product 1').price, 10.00)
 
     def test_unauthenticated_user_cannot_delete_products(self):
         url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 1').pk})
         response = self.client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(Product.objects.count(), 3)
     
     def test_non_seller_users_cannot_create_products(self):
@@ -282,9 +282,9 @@ class ProductViewSetTest(APITestCase):
 
 class OrderViewSetTest(APITestCase):
     def setUp(self):
-        self.user1 = User.objects.create_user(email='user1@example.com', name='User 1', password='testpass123')
-        self.user2 = User.objects.create_user(email='user2@example.com', name='User 2', password='testpass123')
-        self.superuser = User.objects.create_superuser(email='superuser@example.com', name='Superuser', password='superpass123')
+        self.user1 = User.objects.create_user(email='user1@example.com', username='User 1', password='testpass123')
+        self.user2 = User.objects.create_user(email='user2@example.com', username='User 2', password='testpass123')
+        self.superuser = User.objects.create_superuser(email='superuser@example.com', username='Superuser', password='superpass123')
 
         self.store1 = Store.objects.create(name='Store 1', owner=self.user1, address='123 Main St', email='store1@example.com')
         self.store2 = Store.objects.create(name='Store 2', owner=self.user2, address='456 Elm St', email='store2@example.com')
@@ -330,3 +330,95 @@ class OrderViewSetTest(APITestCase):
         response = self.client.get(reverse('order-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
+    
+    def non_aunthenticated_user_can_create_orders_giving_email(self):
+        url = reverse('order-list')
+        data = {'customer_email': 'user@example.com', 'store': self.store1.pk}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Order.objects.count(), 4)
+
+    
+    def non_aunthenticated_user_cannot_create_orders_without_email(self):
+        url = reverse('order-list')
+        data = {'store': self.store1.pk}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Order.objects.count(), 3)
+    
+    def test_authenticated_user_can_create_orders(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('order-list')
+        data = {'store': self.store1.pk}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Order.objects.count(), 4)
+    
+    def test_authenticated_user_cannot_create_orders_for_other_users(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('order-list')
+        data = {'store': self.store2.pk, 'customer': self.user2.pk}
+        response = self.client.post(url, data, format='json')
+        order = Order.objects.get(pk=response.data['id'])
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(order.customer, self.user1)
+    
+    def tes_nobody_can_delete_orders(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('order-detail', kwargs={'pk': self.order1.pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Order.objects.count(), 3)
+
+class OrderItemViewSetTest(APITestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(email='user1@example.com', username='User 1', password='testpass123')
+        self.user2 = User.objects.create_user(email='user2@example.com', username='User 2', password='testpass123')
+        self.superuser = User.objects.create_superuser(email='superuser@example.com', username='Superuser', password='superpass123')
+
+        self.store1 = Store.objects.create(name='Store 1', owner=self.user1, address='123 Main St', email='store1@example.com')
+        self.store2 = Store.objects.create(name='Store 2', owner=self.user2, address='456 Elm St', email='store2@example.com')
+
+        self.product1 = Product.objects.create(name='Product 1', price=10.00, store=self.store1)
+        self.product2 = Product.objects.create(name='Product 2', price=20.00, store=self.store2)
+        self.product3 = Product.objects.create(name='Product 3', price=30.00, store=self.store2)
+
+        self.order1 = Order.objects.create(customer=self.user1, store=self.store1)
+        self.order2 = Order.objects.create(customer=self.user2, store=self.store2)
+        self.order3 = Order.objects.create(customer=self.user2, store=self.store2)
+        self.order4 = Order.objects.create(customer_email='anonuser@example.com', store=self.store1)
+
+        OrderItem.objects.create(order=self.order1, product=self.product1, quantity=2)
+        OrderItem.objects.create(order=self.order2, product=self.product2, quantity=1)
+        OrderItem.objects.create(order=self.order2, product=self.product3, quantity=3)
+    
+    def test_user_sees_own_order_items(self):
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get(reverse('orderitem-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+    
+    def test_user_cannot_see_other_user_order_items(self):
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('orderitem-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+    
+    def test_superuser_sees_all_order_items(self):
+        self.client.force_authenticate(user=self.superuser)
+        response = self.client.get(reverse('orderitem-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)
+    
+    def test_seller_only_sees_order_items_from_their_stores(self):
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('orderitem-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+    
+    def test_seller_cannot_see_order_items_from_other_stores(self):
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('orderitem-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+    
