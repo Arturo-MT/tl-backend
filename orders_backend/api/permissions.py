@@ -21,3 +21,7 @@ class IsProductOwnerOrReadOnly(BasePermission):
             return True
         # Write permissions are only allowed to the owner of the snippet.
         return obj.store.owner == request.user or request.user.is_superuser
+
+class IsAuthenticatedOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        return request.method in SAFE_METHODS or request.user.is_authenticated
