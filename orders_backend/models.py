@@ -5,16 +5,16 @@ from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, name, password=None, **extra_fields):
+    def create_user(self, email, username, password=None, **extra_fields):
         if not email:
             raise ValueError('El Email es obligatorio')
         email = self.normalize_email(email)
-        user = self.model(email=email, name=name, **extra_fields)
+        user = self.model(email=email, username=username, **extra_fields)
         user.password = make_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, name, password=None, **extra_fields):
+    def create_superuser(self, email, username, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
 
@@ -23,7 +23,7 @@ class UserManager(BaseUserManager):
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser must have is_superuser=True.')
 
-        return self.create_user(email, name, password, **extra_fields)
+        return self.create_user(email, username, password, **extra_fields)
 
 # The User class is a model that extends the AbstractUser class and adds additional fields and
 # relationships for user authentication and store ownership.
@@ -44,7 +44,6 @@ class User(AbstractUser):
 
     username = models.CharField(max_length=50, blank=True, null=True)
     email = models.EmailField(unique=True)
-    name = models.CharField(max_length=50, blank=False, default='')
     phone_number = models.CharField(max_length=10, blank=True, null=True)
     password = models.CharField(max_length=128, blank=False)
 
@@ -57,7 +56,7 @@ class User(AbstractUser):
     objects = UserManager()
 
     def __str__(self):
-        return self.name or ''
+        return self.username or ''
 
 # The `Store` class represents a store with attributes such as name, address, phone number, email, and
 # a many-to-many relationship with products.
@@ -95,7 +94,8 @@ class Product(models.Model):
 # The `Order` class represents an order made by a customer in a store, with various status options and
 # timestamps.
 class Order(models.Model):
-    customer = models.ForeignKey(User, on_delete=models.CASCADE, blank=False)
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True, related_name='orders')
+    customer_email = models.EmailField(blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
     
     STATUS_CHOICES = [
@@ -104,6 +104,7 @@ class Order(models.Model):
         ('D', 'Declined'),
         ('P', 'Preparing'),
         ('C', 'Completed'),
+        ('X', 'Cancelled'),
     ]
 
     status = models.CharField(
