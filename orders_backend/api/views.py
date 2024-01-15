@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from orders_backend.models import Product, User, Store, Order, OrderItem
 from .serializers import ProductSerializer, UserSerializer, StoreSerializer, OrderSerializer, OrderItemSerializer
-from .permissions import IsSelfOrStaffOrSuperuser, IsStoreOwnerOrReadOnly, IsProductOwnerOrReadOnly, IsAuthenticatedOrReadOnly
+from .permissions import IsSelfOrStaffOrSuperuser, IsStoreOwnerOrReadOnly, IsProductOwnerOrReadOnly, IsOrderOwnerOrStoreOwner, IsOrderItemOwnerOrStoreOwner
 
 class UserCreateView(CreateAPIView):
     serializer_class = UserSerializer
@@ -63,7 +63,8 @@ class StoreViewSet(ModelViewSet):
         
         if instance.owner != self.request.user:
             raise PermissionDenied("You can only delete a store that you own.")
-        instance.delete()
+
+        raise PermissionDenied("You cannot delete a store.")
 
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all()
@@ -97,7 +98,8 @@ class ProductViewSet(ModelViewSet):
         
         if instance.store.owner != self.request.user:
             raise PermissionDenied("You must be the owner of this store to delete its products.")
-        instance.delete()
+
+        raise PermissionDenied("You cannot delete products from a store.")
     
 class ProductStoreViewSet(ModelViewSet):
     serializer_class = ProductSerializer
@@ -131,7 +133,8 @@ class ProductStoreViewSet(ModelViewSet):
         
         if instance.store.owner != self.request.user:
             raise PermissionDenied("You must be the owner of this store to delete its products.")
-        instance.delete()
+        
+        raise PermissionDenied("You cannot delete products from a store.")
     
 class OrderAndOrderItemPagination(PageNumberPagination):
     page_size = 20
@@ -139,22 +142,26 @@ class OrderAndOrderItemPagination(PageNumberPagination):
 class OrderViewSet(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsOrderOwnerOrStoreOwner]
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_superuser:
+        if not user.is_authenticated:
+            return Order.objects.filter(customer_email=self.request.data.get('customer_email'))
+        elif user.is_superuser:
             return Order.objects.all()
         elif user.is_seller:
             return Order.objects.filter(store__owner=user)
         else:
             return Order.objects.filter(customer=user)
+        
 
     def create(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             email = request.data.get('customer_email')
             if not email:
                 return Response({'detail': 'You must provide an email to create an order as a non-authenticated user.'}, status=status.HTTP_400_BAD_REQUEST)
+            request.data['customer_email'] = email
         else:
             request.data['customer'] = request.user.id
 
@@ -166,27 +173,69 @@ class OrderViewSet(ModelViewSet):
                 raise PermissionDenied("You cannot create orders for other users.")
         serializer.save()
 
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            email = request.data.get('customer_email')
+            if not email:
+                return Response({'detail': 'You must provide an email to update an order as a non-authenticated user.'}, status=status.HTTP_400_BAD_REQUEST)
+            request.data['customer_email'] = email
+        else:
+            request.data['customer'] = request.user.id
+
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=kwargs.pop('partial', False))
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
     def perform_update(self, serializer):
-        if serializer.validated_data.get('customer') != self.request.user:
-            raise PermissionDenied("You can only update your own orders.")
-        serializer.save(customer=self.request.user)
+        if 'customer' in serializer.validated_data:
+            if self.request.user.id != serializer.validated_data['customer'].id:
+                raise PermissionDenied("You cannot update orders for other users.")
     
-    def perform_destroy(self):
-        return Response({'detail': 'Permission denied: You cannot delete this order.'}, status=status.HTTP_403_FORBIDDEN)
-        
+    def perform_destroy(self, instance):
+        raise PermissionDenied("Orders cannot be deleted.")
+
 class OrderItemViewSet(ModelViewSet):
     queryset = OrderItem.objects.all()
     serializer_class = OrderItemSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsOrderItemOwnerOrStoreOwner]
 
     def get_queryset(self):
         user = self.request.user
         if user.is_superuser:
             return OrderItem.objects.all()
         elif user.is_seller:
-            return OrderItem.objects.filter(store__owner=user)
+            return OrderItem.objects.filter(order__store__owner=user)
         else:
             return OrderItem.objects.filter(order__customer=user)
+
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            order_id = request.data.get('order')
+            if order_id is not None:
+                try:
+                    order = Order.objects.get(pk=order_id)
+                    if order.customer_email is None:
+                        return Response({'detail': 'You must provide an email to create an order item for this order.'}, status=status.HTTP_400_BAD_REQUEST)
+                except Order.DoesNotExist:
+                    return Response({'detail': 'The specified order does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({'detail': 'You must provide an order ID to create an order item as a non-authenticated user.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            request.data['customer'] = request.user.id
+
+        return super().create(request, *args, **kwargs)
+    
+    def perform_create(self, serializer):
+        if 'customer' in serializer.validated_data:
+            if self.request.user.id != serializer.validated_data['customer'].id:
+                raise PermissionDenied("You cannot create order items for other users.")
+        serializer.save()
+    
+    def perform_destroy(self, instance):
+        instance.delete()
+
         
 class StoreOrderViewSet(ModelViewSet):
     serializer_class = OrderSerializer
@@ -244,7 +293,6 @@ class StoreOrderItemViewSet(ModelViewSet):
         return super().create(request, *args, **kwargs)
     
     def perform_create(self, serializer):
-        store_id = self.kwargs['store_pk']
         order_id = self.kwargs['order_pk']
         if 'customer' in serializer.validated_data:
             if self.request.user.id != serializer.validated_data['customer'].id:
