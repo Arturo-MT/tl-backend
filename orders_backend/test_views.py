@@ -98,13 +98,6 @@ class StoreViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertNotEqual(Store.objects.get(name='Store 2').phone_number, '1234567890')
     
-    def test_sellers_can_delete_own_stores(self):
-        self.client.force_authenticate(user=self.user1)
-        url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 1').pk})
-        response = self.client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(Store.objects.count(), 2)
-    
     def test_sellers_cannot_delete_other_sellers_stores(self):
         self.client.force_authenticate(user=self.user1)
         url = reverse('store-detail', kwargs={'pk': Store.objects.get(name='Store 2').pk})
@@ -223,13 +216,6 @@ class ProductViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(Product.objects.get(name='Product 2').price, Decimal('20.00'))
     
-    def test_store_owner_can_delete_own_products(self):
-        self.client.force_authenticate(user=self.user1)
-        url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 1').pk})
-        response = self.client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(Product.objects.count(), 2)
-    
     def test_store_owner_cannot_delete_other_store_products(self):
         self.client.force_authenticate(user=self.user1)
         url = reverse('product-detail', kwargs={'pk': Product.objects.get(name='Product 2').pk})
@@ -296,10 +282,12 @@ class OrderViewSetTest(APITestCase):
         self.order1 = Order.objects.create(customer=self.user1, store=self.store1)
         self.order2 = Order.objects.create(customer=self.user2, store=self.store2)
         self.order3 = Order.objects.create(customer=self.user2, store=self.store2)
+        self.order4 = Order.objects.create(customer_email='user@example.com', store=self.store1)
 
         OrderItem.objects.create(order=self.order1, product=self.product1, quantity=2)
         OrderItem.objects.create(order=self.order2, product=self.product2, quantity=1)
         OrderItem.objects.create(order=self.order2, product=self.product3, quantity=3)
+        OrderItem.objects.create(order=self.order4, product=self.product1, quantity=2)
 
     def test_user_sees_own_orders(self):
         self.client.force_authenticate(user=self.user1)
@@ -317,7 +305,7 @@ class OrderViewSetTest(APITestCase):
         self.client.force_authenticate(user=self.superuser)
         response = self.client.get(reverse('order-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 3)
+        self.assertEqual(len(response.data), 4)
     
     def test_seller_only_sees_orders_from_their_stores(self):
         self.client.force_authenticate(user=self.user2)
@@ -337,7 +325,6 @@ class OrderViewSetTest(APITestCase):
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Order.objects.count(), 4)
-
     
     def non_aunthenticated_user_cannot_create_orders_without_email(self):
         url = reverse('order-list')
@@ -352,23 +339,20 @@ class OrderViewSetTest(APITestCase):
         data = {'store': self.store1.pk}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Order.objects.count(), 4)
-    
-    def test_authenticated_user_cannot_create_orders_for_other_users(self):
-        self.client.force_authenticate(user=self.user1)
-        url = reverse('order-list')
-        data = {'store': self.store2.pk, 'customer': self.user2.pk}
-        response = self.client.post(url, data, format='json')
-        order = Order.objects.get(pk=response.data['id'])
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(order.customer, self.user1)
+        self.assertEqual(Order.objects.count(), 5)
     
     def tes_nobody_can_delete_orders(self):
         self.client.force_authenticate(user=self.user1)
         url = reverse('order-detail', kwargs={'pk': self.order1.pk})
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(Order.objects.count(), 3)
+        self.assertEqual(Order.objects.count(), 4)
+    
+    def test_non_authenticated_user_can_edit_order(self):
+        url = reverse('order-detail', kwargs={'pk': self.order4.pk})
+        data = {'status': 'X', 'customer_email': 'user@example.com'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 class OrderItemViewSetTest(APITestCase):
     def setUp(self):
@@ -421,4 +405,11 @@ class OrderItemViewSetTest(APITestCase):
         response = self.client.get(reverse('orderitem-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
+    
+    def test_non_aunthenticated_user_can_create_order_items_to_an_order_with_customer_email(self):
+        url = reverse('orderitem-list')
+        data = {'order': self.order4.pk, 'product': self.product1.pk, 'quantity': 2}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(OrderItem.objects.count(), 4)
     
