@@ -25,3 +25,26 @@ class IsProductOwnerOrReadOnly(BasePermission):
 class IsAuthenticatedOrReadOnly(BasePermission):
     def has_permission(self, request, view):
         return request.method in SAFE_METHODS or request.user.is_authenticated
+
+class IsOrderOwnerOrStoreOwner(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return obj.user == request.user or obj.store.owner == request.user
+
+        if request.user.is_authenticated:
+            if obj.paid:
+                return obj.store.owner == request.user
+            else:
+                return obj.user == request.user or obj.store.owner == request.user
+
+        return obj.customer_email == request.data.get('customer_email') or request.user.is_superuser
+
+class IsOrderItemOwnerOrStoreOwner(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return obj.order.user == request.user or obj.order.store.owner == request.user
+
+        if request.user.is_authenticated:
+            return obj.order.user == request.user
+
+        return obj.order.customer_email == request.data.get('customer_email') or request.user.is_superuser

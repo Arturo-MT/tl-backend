@@ -97,6 +97,7 @@ class Order(models.Model):
     customer = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True, related_name='orders')
     customer_email = models.EmailField(blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
+    paid = models.BooleanField(default=False, editable=False)
     
     STATUS_CHOICES = [
         ('R', 'Received'),
