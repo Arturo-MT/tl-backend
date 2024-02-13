@@ -1,5 +1,15 @@
 from orders_backend.models import Product, User, Store, Order, OrderItem
 from rest_framework.serializers import ModelSerializer, PrimaryKeyRelatedField, CurrentUserDefault
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['username'] = self.user.username
+        data['email'] = self.user.email
+        data['is_seller'] = self.user.is_staff
+        data['id'] = self.user.id
+        return data
 
 class UserSerializer(ModelSerializer):
     class Meta:
