@@ -7,8 +7,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework import status
 from orders_backend.models import Product, User, Store, Order, OrderItem
-from .serializers import ProductSerializer, UserSerializer, StoreSerializer, OrderSerializer, OrderItemSerializer
+from .serializers import ProductSerializer, UserSerializer, StoreSerializer, OrderSerializer, OrderItemSerializer, MyTokenObtainPairSerializer
 from .permissions import IsSelfOrStaffOrSuperuser, IsStoreOwnerOrReadOnly, IsProductOwnerOrReadOnly, IsOrderOwnerOrStoreOwner, IsOrderItemOwnerOrStoreOwner
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
+    permission_classes = (AllowAny,)
 
 class UserCreateView(CreateAPIView):
     serializer_class = UserSerializer
@@ -20,9 +25,11 @@ class UserCreateView(CreateAPIView):
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
         data = {
-            'user': serializer.data,
             'refresh': str(refresh),
             'access': str(refresh.access_token),
+            'username': user.username,
+            'is_seller': user.is_seller,
+            'id': user.id,
         }
         return Response(data, status=status.HTTP_201_CREATED)
 
