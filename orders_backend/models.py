@@ -42,7 +42,7 @@ class User(AbstractUser):
         related_name='custom_users_permissions'
     )
 
-    username = models.CharField(max_length=50, blank=True, null=True)
+    username = models.CharField(max_length=50, blank=True, null=True, unique=True)
     email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=10, blank=True, null=True)
     password = models.CharField(max_length=128, blank=False)
