@@ -22,6 +22,10 @@ class UserCreateView(CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if User.objects.filter(username=serializer.validated_data['username']).exists():
+            return Response({'detail': 'A user with that username already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email=serializer.validated_data['email']).exists():
+            return Response({'detail': 'A user with that email already exists.'}, status=status.HTTP_400_BAD_REQUEST)
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
         data = {
@@ -113,8 +117,10 @@ class ProductStoreViewSet(ModelViewSet):
     permission_classes = [IsProductOwnerOrReadOnly]
 
     def get_queryset(self):
-        store_id = self.kwargs['store_pk']
-        return Product.objects.filter(store=store_id)
+        return Product.objects.all()
+
+    def filter_queryset(self, queryset):
+        return queryset.filter(store=self.kwargs['store_pk'])
     
     def perform_create(self, serializer):
         if not self.request.user.is_authenticated:
@@ -152,15 +158,18 @@ class OrderViewSet(ModelViewSet):
     permission_classes = [IsOrderOwnerOrStoreOwner]
 
     def get_queryset(self):
+        return Order.objects.all()
+
+    def filter_queryset(self, queryset):
         user = self.request.user
         if not user.is_authenticated:
-            return Order.objects.filter(customer_email=self.request.data.get('customer_email'))
+            return queryset.filter(customer_email=self.request.data.get('customer_email'))
         elif user.is_superuser:
-            return Order.objects.all()
+            return queryset
         elif user.is_seller:
-            return Order.objects.filter(store__owner=user)
+            return queryset.filter(store__owner=user)
         else:
-            return Order.objects.filter(customer=user)
+            return queryset.filter(customer=user)
         
 
     def create(self, request, *args, **kwargs):
@@ -209,13 +218,16 @@ class OrderItemViewSet(ModelViewSet):
     permission_classes = [IsOrderItemOwnerOrStoreOwner]
 
     def get_queryset(self):
+        return OrderItem.objects.all()
+
+    def filter_queryset(self, queryset):
         user = self.request.user
         if user.is_superuser:
-            return OrderItem.objects.all()
+            return queryset
         elif user.is_seller:
-            return OrderItem.objects.filter(order__store__owner=user)
+            return queryset.filter(order__store__owner=user)
         else:
-            return OrderItem.objects.filter(order__customer=user)
+            return queryset.filter(order__customer=user)
 
     def create(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -249,9 +261,13 @@ class StoreOrderViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        return Order.objects.all()
+
+    def filter_queryset(self, queryset):
         store_id = self.kwargs['store_pk']
         if self.request.user.is_seller:
-            return Order.objects.filter(store=store_id, store__owner=self.request.user)
+            return queryset.filter(store=store_id, store__owner=self.request.user)
+        return queryset
     
     def create(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -284,10 +300,15 @@ class StoreOrderItemViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        return OrderItem.objects.all()
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
         store_id = self.kwargs['store_pk']
         order_id = self.kwargs['order_pk']
         if self.request.user.is_seller:
-            return OrderItem.objects.filter(order=order_id, order__store=store_id, order__store__owner=self.request.user)
+            return queryset.filter(order=order_id, order__store=store_id, order__store__owner=self.request.user)
+        return queryset
     
     def create(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -307,7 +328,6 @@ class StoreOrderItemViewSet(ModelViewSet):
         serializer.save(order=order_id)
     
     def perform_update(self, serializer):
-        store_id = self.kwargs['store_pk']
         order_id = self.kwargs['order_pk']
         if serializer.validated_data.get('customer') != self.request.user:
             raise PermissionDenied("You can only update your own order items.")
