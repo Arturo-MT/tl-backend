@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-#j93=mldc-kaw*q&b+o#8(%)r9m)j@@7w96+y*54ypl=ww*bc=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'orders_backend.apps.OrdersBackendConfig',
+    'payments.apps.PaymentsConfig',
     'corsheaders',
     'rest_framework_simplejwt'
 ]
@@ -59,6 +60,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:8000",
+    "https://e013-187-228-146-26.ngrok-free.app",
 ]
 
 ROOT_URLCONF = 'tl_backend.urls'
@@ -110,6 +112,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
 }
 
