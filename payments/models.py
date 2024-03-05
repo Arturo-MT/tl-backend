@@ -1,7 +1,7 @@
 from django.db import models
 
 class Payment(models.Model):
-    order = models.ForeignKey('orders_backend.Order', on_delete=models.CASCADE)
+    order = models.ForeignKey('orders.Order', on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -15,7 +15,7 @@ class Payment(models.Model):
         return str(self.id)
 
 class Suscription(models.Model):
-    user = models.ForeignKey('orders_backend.User', on_delete=models.CASCADE)
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)

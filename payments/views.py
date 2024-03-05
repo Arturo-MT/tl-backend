@@ -3,7 +3,7 @@ from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import MyCheckoutSerializer, MyWebhookSerializer
-from orders_backend.models import Order
+from orders.models import Order
 import stripe
 
 stripe.api_key = 'sk_test_51OpHX02KSoBXprSFsfySxza5p7jKrRon7cwtzbgISH9Ncud9e9gFdctQpDYdggKJNOtm72CkwUxDrCqUted52J2s00xkeM999J'

@@ -39,8 +39,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'orders_backend.apps.OrdersBackendConfig',
+    'orders.apps.OrdersBackendConfig',
     'payments.apps.PaymentsConfig',
+    'users.apps.UsersConfig',
     'corsheaders',
     'rest_framework_simplejwt'
 ]
@@ -137,7 +138,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-AUTH_USER_MODEL = 'orders_backend.User'
+AUTH_USER_MODEL = 'users.User'
 
 
 # Internationalization
