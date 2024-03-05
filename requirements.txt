@@ -8,3 +8,4 @@ djangorestframework==3.12.4
 django-cors-headers==3.8.0
 djangorestframework-simplejwt==4.4.0
 PyJWT==v1.7.1
+stripe==8.5.0
