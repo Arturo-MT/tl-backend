@@ -103,7 +103,8 @@ class Order(models.Model):
         ('R', 'Received'),
         ('A', 'Accepted'),
         ('D', 'Declined'),
-        ('P', 'Preparing'),
+        ('P', 'Paid'),
+        ('O', 'On process'),
         ('C', 'Completed'),
         ('X', 'Cancelled'),
     ]
@@ -119,7 +120,7 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.name or ''
+        return f"Order {self.id}"
 
 # The `OrderItem` class represents an item in an order, with properties such as the order it belongs
 # to, the product being ordered, the quantity, a description, and the store it is being ordered from.
@@ -130,7 +131,7 @@ class OrderItem(models.Model):
     description = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return self.name or ''
+        return f"{self.product.name} x {self.quantity}"
     
 # The Payment class represents a payment made for an order, including the amount, payment date, and
 # store information.
@@ -141,4 +142,4 @@ class Payment(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
     
     def __str__(self):
-        return self.name or ''
+        return f"Payment {self.id}"
