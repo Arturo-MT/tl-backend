@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import ProductViewSet, UserCreateView, UserDetailView, StoreViewSet, OrderViewSet, OrderItemViewSet, ProductStoreViewSet, StoreOrderViewSet, StoreOrderItemViewSet
+from payments.views import CheckoutSessionView, WebhookView
 
 router = DefaultRouter()
 router.register(r'products', ProductViewSet)
@@ -40,4 +41,11 @@ urlpatterns = [
         'put': 'update',  # Update an order item in an order
         'delete': 'destroy',  # Delete an order item in an order
         }), name='order-order-items-list'),
+    path('stores/<int:store_pk>/orders/<int:order_pk>/order-items/<int:pk>/', StoreOrderItemViewSet.as_view({
+        'get': 'retrieve',  # Get an order item in an order
+        'put': 'update',  # Update an order item in an order
+        'delete': 'destroy',  # Delete an order item in an order
+        }), name='order-order-items-detail'),
+    path('stores/<int:store_pk>/orders/<int:order_id>/checkout/', CheckoutSessionView.as_view(), name='checkout-session'),
+    path('webhook/', WebhookView.as_view(), name='webhook'),
 ]
