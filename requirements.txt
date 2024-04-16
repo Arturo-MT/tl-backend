@@ -10,3 +10,4 @@ djangorestframework-simplejwt==4.4.0
 PyJWT==v1.7.1
 stripe==8.5.0
 requests_mock==1.9.3
+drf_yasg==1.21.7
